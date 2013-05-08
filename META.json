@@ -1,0 +1,40 @@
+{
+   "abstract" : "Mount MythTV recordings as a file system",
+   "author" : [
+      "Lincoln Stein <lincoln.stein@oicr.on.ca>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.110440",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Mythfs-perl",
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "Module::Build" : 0
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Date::Parse" : "2.30",
+            "Fuse" : "0.09",
+            "JSON" : 0,
+            "WWW::Curl" : "4.15",
+            "XML::Simple" : "2.18",
+            "threads" : 0
+         }
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "1.20"
+}
