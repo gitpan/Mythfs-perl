@@ -57,6 +57,8 @@ use constant Templates => {
     S  => '{SubTitle}',
     R  => '{Description}',
     C  => '{Category}',
+    ST => '{SubTitle}?{SubTitle}:{Title}',   # prefer %S?%S:%T
+    TC => '{SubTitle}?{Title}:{Category}',   # prefer %S?%T:%C
     se => '{Season}',
     e  => '{Episode}',
     PI => '{ProgramId}',
@@ -203,6 +205,29 @@ sub new {
     $self->semaphore(Thread::Semaphore->new($self->maxgets)),
     return $self;
 }
+
+=head2 Accessors
+
+These methods get or set the correspondingly-named values:
+
+ debug()
+ backend()
+ port()
+ maxgets()
+ threaded()
+ pattern()
+ delimiter()
+ mtime()
+ localmount()
+
+These methods are used internally:
+
+ dummy_data()
+ cache()
+ cachetime()
+ semaphore()
+
+=cut
 
 =head2 $r->start_update_thread
 
@@ -354,6 +379,27 @@ sub recording2path {
     return grep {length} @components;
 }
 
+
+
+=head2 $message = $r->status
+
+Returns the last status message.
+
+=cut
+
+sub status {
+    my $self  = shift;
+    my $r     = $self->get_recorded;
+    my $mtime = localtime($self->mtime);
+    return "$mtime: $r->{status}\n";
+}
+
+=head2 $time = $r->mtime
+
+Return the time that the status was last updated.
+
+=cut
+
 =head2 @entries = $r->entries($path)
 
 Given a path to a directory in the virtual filesystem, return all
@@ -466,6 +512,7 @@ sub download_recorded_file {
     my $byterange= $offset.'-'.($offset+$size-1);
 
     my $http = HTTP::Lite->new;
+    $http->http11_mode(1);
     $http->add_req_header(Range => $byterange);
 
     # by placing the request between semaphores, we ensure no more than maxgetws
@@ -519,12 +566,24 @@ sub _compile_pattern_sub {
 	    $sub .= "return strftime('$1',localtime(str2time(\$recording->$2)||0)) if \$code eq '$code';\n";
 	    next;
 	}
+	if ($field =~ /(.+)\?(.+)\:(.+)/) {  # something like '{SubTitle}?{SubTitle}:{Title}'
+	    $sub .= <<END;
+	    if (\$code eq '$code') {
+		my \$val = \$recording->$1?\$recording->$2:\$recording->$3;
+		\$val  ||= '';
+		\$val =~ tr!a-zA-Z0-9_.,&\@:* ^\\![]{}(),?#\$=+%-!_!c;
+		return \$val;
+	    }
+END
+    next;
+	}
+
 	$sub .= <<END;
-if (\$code eq '$code') {
-    my \$val = \$recording->$field || '';
-    \$val =~ tr!a-zA-Z0-9_.,&\@:* ^\\![]{}(),?#\$=+%-!_!c;
-    return \$val;
-}
+	if (\$code eq '$code') {
+	    my \$val = \$recording->$field || '';
+	    \$val =~ tr!a-zA-Z0-9_.,&\@:* ^\\![]{}(),?#\$=+%-!_!c;
+	    return \$val;
+	}
 END
     ;
     }
@@ -551,9 +610,18 @@ sub _refresh_recorded {
     lock %Cache;
     my $var    = {};
     my $parser = XML::Simple->new(SuppressEmpty=>1);
-    my $data = $self->_fetch_recorded_data() or return;
-    my $rec = $parser->XMLin($data);
-    $self->_build_directory_map($rec,$var);
+    my ($status,$data) = $self->_fetch_recorded_data();
+    $var->{status} = $status;
+    if ($status eq 'ok') {
+	my $rec = $parser->XMLin($data);
+	$self->_build_directory_map($rec,$var);
+    } else {
+	print STDERR "ERROR: $status..." if $self->debug;
+	$var->{paths}{'.'} = {ctime  => time(),
+			      mtime  => time(),
+			      length => 2,
+			      type   => 'directory'};
+    }
     $Cache{recorded} = encode_json($var);
     $Cache{mtime}    = time();
     print STDERR "mtime set to $Cache{mtime}\n" if $self->debug;
@@ -564,19 +632,25 @@ sub _refresh_recorded {
 sub _fetch_recorded_data {
     my $self = shift;
 
-    return $self->dummy_data if $self->dummy_data;
+    return ('ok',$self->dummy_data) if $self->dummy_data;
 
     my $host = $self->backend;
     my $port = $self->port;
 
     my $http     = HTTP::Lite->new;
+    $http->http11_mode(1);
     my $retcode  = $http->request("http://$host:$port/Dvr/GetRecordedList");
-    unless ($retcode && $retcode =~ /^2\d\d/) {
-	warn "request failed with $retcode ",$http->status_message;
-	return;
+    my $status;
+
+    if ($retcode && $retcode =~ /^2\d\d/) {
+	$status = 'ok';
+    } elsif ($retcode) {
+	$status = "request failed with $retcode ",$http->status_message
+    } else {
+	$status = "no response from server";
     }
 
-    return $http->body;
+    return ($status,$http->body);
 }
 
 sub _build_directory_map {

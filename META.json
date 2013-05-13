@@ -33,7 +33,7 @@
    "provides" : {
       "Net::MythTV::Fuse" : {
          "file" : "lib/Net/MythTV/Fuse.pm",
-         "version" : "1.30"
+         "version" : "1.32"
       },
       "Net::MythTV::Fuse::Recordings" : {
          "file" : "lib/Net/MythTV/Fuse/Recordings.pm",
@@ -46,5 +46,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.30"
+   "version" : "1.32"
 }

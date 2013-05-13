@@ -15,7 +15,7 @@ name: Mythfs-perl
 provides:
   Net::MythTV::Fuse:
     file: lib/Net/MythTV/Fuse.pm
-    version: 1.30
+    version: 1.32
   Net::MythTV::Fuse::Recordings:
     file: lib/Net/MythTV/Fuse/Recordings.pm
     version: 0
@@ -28,4 +28,4 @@ requires:
   threads: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.30
+version: 1.32
